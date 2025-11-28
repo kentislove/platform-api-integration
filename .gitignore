@@ -5,3 +5,15 @@ node_modules/
 Thumbs.db
 ~$*
 *.tmp
+
+# 敏感憑證資訊
+credentials.json
+*.key
+*.pem
+
+# 暫存檔案
+temp_*
+
+# IDE 設定
+.vscode/
+.idea/
