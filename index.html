@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平台庫存管理系統 (本地測試版)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; text-align: center; }
+        .section { margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #3367d6; }
+        button.secondary { background-color: #34a853; }
+        #result, #syncStatus {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 5px solid #ddd;
+            display: none;
+        }
+        .success { border-left-color: #34a853 !important; }
+        .error { border-left-color: #ea4335 !important; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 平台庫存管理系統</h1>
+        
+        <div class="section">
+            <h2>⚙️ 設定</h2>
+            <div class="form-group">
+                <label for="apiUrl">Google Apps Script 網頁應用程式網址:</label>
+                <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/..../exec">
+                <small style="color: #666;">請輸入部署後的 GAS 網址</small>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 庫存查詢</h2>
+            <div class="form-group">
+                <label for="vendorCode">廠商原料號:</label>
+                <input type="text" id="vendorCode" placeholder="例如: ABC-12345">
+            </div>
+            <button onclick="searchInventory()">查詢庫存</button>
+            <div id="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔄 系統操作</h2>
+            <button class="secondary" onclick="triggerSync()">手動觸發全平台同步</button>
+            <div id="syncStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        async function searchInventory() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const code = document.getElementById('vendorCode').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!apiUrl) {
+                alert('請先輸入 GAS 網址！');
+                return;
+            }
+            if (!code) {
+                alert('請輸入廠商原料號！');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = '';
+            resultDiv.innerHTML = '<span class="loading">查詢中...</span>';
+
+            try {
+                // 呼叫 GAS API
+                const response = await fetch(`${apiUrl}?action=getInventory&code=${code}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <h3>查詢結果</h3>
+                        <p><strong>商品代碼:</strong> ${data.data.code}</p>
+                        <p><strong>目前庫存:</strong> ${data.data.quantity}</p>
+                        <p><strong>可用庫存:</strong> ${data.data.available}</p>
+                        <p><strong>最後更新:</strong> ${new Date(data.data.lastUpdated).toLocaleString()}</p>
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `<p>❌ 錯誤: ${data.message}</p>`;
+                }
+            } catch (e) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `<p>❌ 連線失敗: ${e.message}</p><p>請確認網址是否正確，且已部署為「所有人」可存取。</p>`;
+            }
+        }
+
+        async function triggerSync() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const statusDiv = document.getElementById('syncStatus');
+            
+            if (!apiUrl) {
+                alert('請先輸入 GAS 網址！');
+                return;
+            }
+
+            statusDiv.style.display = 'block';
+            statusDiv.className = '';
+            statusDiv.innerHTML = '<span class="loading">發送同步請求中...</span>';
+
+            try {
+                // 使用 no-cors 模式發送 POST 請求觸發同步
+                await fetch(`${apiUrl}?action=syncInventory`, {
+                    method: 'POST',
+                    mode: 'no-cors'
+                });
+                
+                statusDiv.className = 'success';
+                statusDiv.innerHTML = `
+                    <p>✅ 同步指令已發送！</p>
+                    <p>系統正在背景執行同步作業，請稍後檢查 Email 通知。</p>
+                `;
+            } catch (e) {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = `<p>❌ 發送失敗: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
